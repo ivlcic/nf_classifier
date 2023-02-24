@@ -1,16 +1,11 @@
 import nf
 import logging
-import pandas as pd
 import numpy as np
 import torch
-import evaluate
 
 
-from typing import List
-from tokenizers.tokenizers import Encoding
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, BatchEncoding, \
     PreTrainedModel, PreTrainedTokenizer
-from torch.utils.data import DataLoader
 
 logger = logging.getLogger('train')
 logger.addFilter(nf.fmt_filter)
@@ -42,7 +37,6 @@ class SeqClassModelContainer(ModelContainer):
             model_name, cache_dir=model_dir, num_labels=len(labeler.label_id_map),
             id2label=labeler.ids_to_labels, label2id=labeler.label_id_map
         )
-
 
     def forward(self, input_id, mask, label):
         output = self.model(input_ids=input_id, attention_mask=mask, labels=label, return_dict=False)
@@ -85,56 +79,3 @@ class SeqClassModelContainer(ModelContainer):
 class TrainedModelContainer(ModelContainer):
     def __init__(self, model_dir: str, labeler: nf.Labeler):
         super().__init__(None, model_dir, labeler)
-
-
-class DataSequence(torch.utils.data.Dataset):
-
-    def align_labels(self, encoded: Encoding, labels: List[str]):
-        word_ids = encoded.word_ids
-        label_ids = []
-        max_idx = len(labels)
-        for word_idx in word_ids:
-            if word_idx is None:
-                label_ids.append(-100)
-            elif word_idx < 0 or word_idx >= max_idx:
-                label_ids.append(-100)
-            else:
-                label_ids.append(self.label_id_map[labels[word_idx]])
-        return label_ids
-
-    def del_ner(self, ner_text: str):
-        for rem_ner_tag in self.remove_ner_tags:
-            ner_text = ner_text.replace(rem_ner_tag, 'O')
-        return ner_text
-
-    def __init__(self, model: ModelContainer, data: pd.DataFrame, max_seq_len: int):
-        # self.remove_ner_tags = model.remove_ner_tags
-        self.label_id_map = model.label_id_map
-        self.max_seq_len = max_seq_len
-
-        ner_labels = [self.del_ner(i).split() for i in data['ner'].values.tolist()]
-
-        unique_labels = set()
-        for lb in ner_labels:
-            [unique_labels.add(i) for i in lb if i not in unique_labels]
-        if unique_labels != self.label_id_map.keys():
-            logger.error("Unexpected NER tag [%s] in [%s] in dataset!",
-                         unique_labels, self.label_id_map.keys())
-            exit(1)
-
-        sentences = data['sentence'].values.tolist()
-        self.encodings: BatchEncoding = model.tokenizer(
-            sentences, padding='max_length', max_length=max_seq_len, truncation=True, return_tensors="pt"
-        )
-        self.labels = []
-        self.ner_tags = ner_labels
-        for i, e in enumerate(self.encodings.encodings):
-            self.labels.append(self.align_labels(e, ner_labels[i]))
-
-    def __len__(self):
-        return len(self.labels)
-
-    def __getitem__(self, idx):
-        item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
-        item['labels'] = torch.tensor(self.labels[idx])
-        return item
