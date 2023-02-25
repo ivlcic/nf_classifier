@@ -3,3 +3,5 @@ torch>=1.13.1
 transformers>=4.26.1
 stanza>=1.4.2
 pandas>=1.5.3
+seqeval>=1.2.2
+evaluate>=0.4.0

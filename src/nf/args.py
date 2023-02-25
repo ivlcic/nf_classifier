@@ -16,7 +16,7 @@ def dir_path(dir_name) -> str:
         raise NotADirectoryError(dir_name)
 
 
-def args_common_dirs(parser) -> None:
+def common_dirs(parser) -> None:
     parser.add_argument(
         '-d', '--data_dir', help='Data output directory',
         type=dir_path, default='data'
@@ -27,13 +27,21 @@ def args_common_dirs(parser) -> None:
     )
 
 
-def args_device(parser) -> None:
+def device(parser) -> None:
     parser.add_argument(
         '-c', '--limit_cuda_device', help='Limit ops to specific cuda device.', type=int, default=None
     )
 
 
-def args_train(parser) -> None:
+def train(parser) -> None:
+    common_dirs(parser)
     parser.add_argument(
         '-b', '--batch', help='Batch size.', type=int, default=32
     )
+    parser.add_argument(
+        '-l', '--learn_rate', help='Learning rate', type=float, default=5e-5
+    )
+    parser.add_argument(
+        '-e', '--epochs', help='Number of epochs.', type=int, default=20
+    )
+    device(parser)
