@@ -1,16 +1,19 @@
-from typing import List
-
-import nf
+import os
+import json
 import logging
 import numpy as np
 import pandas as pd
 import torch
 import evaluate
 
+from typing import List
 from torch.utils.data import DataLoader
 from tokenizers.tokenizers import Encoding
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForTokenClassification, \
-    BatchEncoding, PreTrainedModel, PreTrainedTokenizer
+    BatchEncoding, PreTrainedModel, PreTrainedTokenizer, TrainingArguments, Trainer
+
+import nf
+import nf.data
 
 logger = logging.getLogger('train')
 logger.addFilter(nf.fmt_filter)
@@ -170,13 +173,15 @@ class DataSequence(torch.utils.data.Dataset):
                          unique_labels, true_labels)
             exit(1)
 
+        # encode the text
         texts = data[text_field].values.tolist()
         self.encodings: BatchEncoding = model.tokenizer(
             texts, padding='max_length', max_length=max_seq_len, truncation=True, return_tensors="pt"
         )
+        # encode the labels
         self.labels = []
         for i, e in enumerate(self.encodings.encodings):
-            self.labels.append(self.align_labels(e, all_labels[i]))
+            self.labels.append(self.align_labels(e, ds_labels[i]))
 
     def __len__(self):
         return len(self.labels)
@@ -185,3 +190,64 @@ class DataSequence(torch.utils.data.Dataset):
         item = {key: val[idx].clone().detach() for key, val in self.encodings.items()}
         item['labels'] = torch.tensor(self.labels[idx])
         return item
+
+
+def train(args, mc: ModelContainer, result_dir: str, data_path_prefix: str) -> None:
+    training_args = TrainingArguments(
+        output_dir=result_dir,
+        num_train_epochs=args.epochs,
+        per_device_train_batch_size=args.batch,
+        per_device_eval_batch_size=args.batch,
+        evaluation_strategy="epoch",
+        disable_tqdm=True,
+        load_best_model_at_end=True,
+        save_strategy='epoch',
+        learning_rate=args.learn_rate,
+        optim='adamw_torch',
+        save_total_limit=1,
+        metric_for_best_model='f1',
+        logging_strategy='epoch',
+    )
+
+    train_data, eval_data, test_data = nf.data.load_corpus(data_path_prefix)
+    logger.debug("Constructing train data set [%s]...", len(train_data))
+    train_set = DataSequence(mc, train_data, args.max_seq_len)
+    logger.info("Constructed train data set [%s].", len(train_data))
+    logger.debug("Constructing evaluation data set [%s]...", len(eval_data))
+    eval_set = DataSequence(mc, eval_data, args.max_seq_len)
+    logger.info("Constructed evaluation data set [%s].", len(eval_data))
+    logger.debug("Constructing test data set [%s]...", len(test_data))
+    test_set = DataSequence(mc, test_data, args.max_seq_len)
+    logger.info("Constructed test data set [%s].", len(test_data))
+
+    training_args.logging_steps = len(train_set)
+
+    trainer = Trainer(
+        model=mc.model,
+        args=training_args,
+        train_dataset=train_set,
+        eval_dataset=eval_set,
+        tokenizer=mc.tokenizer,
+        compute_metrics=mc.compute_metrics
+    )
+    logger.debug("Starting training...")
+    trainer.train()
+    logger.info("Training done.")
+    logger.debug("Starting evaluation...")
+    trainer.evaluate()
+    logger.info("Evaluation done.")
+
+    logger.info("Starting test set evaluation...")
+    predictions, labels, _ = trainer.predict(test_set)
+    results = mc.compute_metrics((predictions, labels), True)
+    logger.info("Test set evaluation results:")
+    logger.info("%s", results)
+    combined_results = {}
+    if os.path.exists(os.path.join(args.models_dir, 'results_all.json')):
+        with open(os.path.join(args.models_dir, 'results_all.json')) as json_file:
+            combined_results = json.load(json_file)
+    combined_results[args.target_model_name] = results
+    with open(os.path.join(args.models_dir, 'results_all.json'), 'wt', encoding='utf-8') as fp:
+        json.dump(combined_results, fp, cls=nf.data.NpEncoder)
+    with open(os.path.join(args.models_dir, args.target_model_name + ".json"), 'wt') as fp:
+        json.dump(results, fp, cls=nf.data.NpEncoder)

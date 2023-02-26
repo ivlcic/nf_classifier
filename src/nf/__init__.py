@@ -107,11 +107,11 @@ class MultiLabeler(Labeler):
 
     def __init__(self, file_name: str = None, labels: List = None, replace_labels: List = None):
         super().__init__(file_name, labels, replace_labels)
-        n = 2 ** len(self.source_labels)
+        n = 2 ** len(self._source_labels)
         self.labels = []
         for i in range(0, n):
             bitlist = [k for k in range(i.bit_length()) if i & (1 << k)]
             label = ''
             for idx in bitlist:
-                label += self.source_labels[idx]
+                label += self._source_labels[idx]
             self.labels.append(label)
