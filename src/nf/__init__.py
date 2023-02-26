@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-from typing import List
+from typing import List, Dict
 
 # sad hack
 for x, arg in enumerate(sys.argv):
@@ -50,43 +50,63 @@ def get_pretrained_model_path(args, train: bool = False) -> str:
 
 class Labeler:
 
-    def __init__(self, file_name: str = None, labels: List = None, remove_labels: List = None):
-        if remove_labels is None:
-            remove_labels = []
+    def __init__(self, file_name: str = None, labels: List = None, replace_labels: Dict[str, str] = None):
+        if replace_labels is None:
+            replace_labels = {}
         if labels is None:
             labels = []
 
         if file_name is not None and os.path.exists(file_name):
             with open(file_name, "r", encoding='utf-8') as fp:
-                self.labels = fp.read().splitlines()
+                self._labels = fp.read().splitlines()
         else:
-            self.labels = labels
-        if not self.labels:
+            self._labels = labels
+        if not self._labels:
             raise ValueError('Either valid file_name or labels list must be present')
-        self.source_labels = self.labels
-        self.removed_labels = remove_labels
-        self.label_to_id = {k: v for v, k in enumerate(self.labels) if k not in self.removed_labels}
-        self.id_to_label = {v: k for v, k in enumerate(self.labels) if k not in self.removed_labels}
+        self._source_labels = self._labels
+        self._replace_labels = replace_labels
+        self._label_to_id = {k: v for v, k in enumerate(self._labels) if k not in self._replace_labels.keys()}
+        self._id_to_label = {v: k for v, k in enumerate(self._labels) if k not in self._replace_labels.keys()}
 
     def label2id(self, label: str) -> int:
         if not label:
             return -1
-        if label in self.label_to_id:
-            return self.label_to_id[label]
+        if label in self._label_to_id:
+            return self._label_to_id[label]
         return -1
 
-    def id2label(self, ident: int) -> str:
-        if not ident:
+    def labels2ids(self):
+        return self._label_to_id
+
+    def id2label(self, _id: int) -> str:
+        if not _id:
             return None
-        if ident in self.id_to_label:
-            return self.id_to_label[ident]
+        if _id in self._id_to_label:
+            return self._id_to_label[_id]
         return None
+
+    def ids2labels(self):
+        return self._id_to_label
+
+    def kept_labels(self):
+        return self._label_to_id.keys()
+
+    def labels(self):
+        return self._label_to_id.keys()
+
+    def mun_labels(self):
+        return len(self._label_to_id.keys())
+
+    def filter_replace(self, text: str):
+        for k, v in self._replace_labels.items():
+            text = text.replace(k, v)
+        return text
 
 
 class MultiLabeler(Labeler):
 
-    def __init__(self, file_name: str = None, labels: List = None, remove_labels: List = None):
-        super().__init__(file_name, labels, remove_labels)
+    def __init__(self, file_name: str = None, labels: List = None, replace_labels: List = None):
+        super().__init__(file_name, labels, replace_labels)
         n = 2 ** len(self.source_labels)
         self.labels = []
         for i in range(0, n):
