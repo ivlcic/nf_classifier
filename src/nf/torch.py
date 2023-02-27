@@ -31,7 +31,6 @@ class ModelContainer(torch.nn.Module):
         )
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda" if use_cuda else "cpu")
-        self.model.to(device)
         self.device = device
 
 
@@ -45,6 +44,7 @@ class TokenClassModelContainer(ModelContainer):
             model_name, cache_dir=model_dir, num_labels=labeler.mun_labels(),
             id2label=labeler.ids2labels(), label2id=labeler.labels2ids()
         )
+        self.model.to(self.device)
 
     def forward(self, input_id, mask, label):
         output = self.model(input_ids=input_id, attention_mask=mask, labels=label, return_dict=False)
@@ -192,9 +192,10 @@ class DataSequence(torch.utils.data.Dataset):
         return item
 
 
-def train(args, mc: ModelContainer, result_dir: str, data_path_prefix: str) -> None:
+def train(args, mc: ModelContainer, result_path: str, data_path: str,
+          label_field: str = 'label', text_field: str = 'text') -> None:
     training_args = TrainingArguments(
-        output_dir=result_dir,
+        output_dir=result_path,
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch,
         per_device_eval_batch_size=args.batch,
@@ -203,22 +204,20 @@ def train(args, mc: ModelContainer, result_dir: str, data_path_prefix: str) -> N
         load_best_model_at_end=True,
         save_strategy='epoch',
         learning_rate=args.learn_rate,
-        optim='adamw_torch',
+        #optim='adamw_torch',
+        #optim='adamw_hf',
         save_total_limit=1,
         metric_for_best_model='f1',
         logging_strategy='epoch',
     )
 
-    train_data, eval_data, test_data = nf.data.load_corpus(data_path_prefix)
+    train_data, eval_data, test_data = nf.data.load_corpus(data_path)
     logger.debug("Constructing train data set [%s]...", len(train_data))
-    train_set = DataSequence(mc, train_data, args.max_seq_len)
+    train_set = DataSequence(mc, train_data, args.max_seq_len, label_field, text_field)
     logger.info("Constructed train data set [%s].", len(train_data))
     logger.debug("Constructing evaluation data set [%s]...", len(eval_data))
-    eval_set = DataSequence(mc, eval_data, args.max_seq_len)
+    eval_set = DataSequence(mc, eval_data, args.max_seq_len, label_field, text_field)
     logger.info("Constructed evaluation data set [%s].", len(eval_data))
-    logger.debug("Constructing test data set [%s]...", len(test_data))
-    test_set = DataSequence(mc, test_data, args.max_seq_len)
-    logger.info("Constructed test data set [%s].", len(test_data))
 
     training_args.logging_steps = len(train_set)
 
@@ -238,6 +237,9 @@ def train(args, mc: ModelContainer, result_dir: str, data_path_prefix: str) -> N
     logger.info("Evaluation done.")
 
     logger.info("Starting test set evaluation...")
+    logger.debug("Constructing test data set [%s]...", len(test_data))
+    test_set = DataSequence(mc, test_data, args.max_seq_len, label_field, text_field)
+    logger.info("Constructed test data set [%s].", len(test_data))
     predictions, labels, _ = trainer.predict(test_set)
     results = mc.compute_metrics((predictions, labels), True)
     logger.info("Test set evaluation results:")

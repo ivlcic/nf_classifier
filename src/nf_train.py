@@ -30,16 +30,16 @@ if __name__ == "__main__":
     model_name = args.pretrained_model + '-' + '.'.join(args.corpora)
     args.target_model_name = model_name
 
-    model_result_dir = os.path.join(args.models_dir, args.target_model_name)
-    if not os.path.exists(model_result_dir):
-        os.makedirs(model_result_dir)
+    result_dir = os.path.join(args.models_dir, args.target_model_name)
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
 
     mc = SeqClassModelContainer(
         nf.get_pretrained_model_path(args, True),
         nf.model_name_map[args.pretrained_model],
-        nf.MultiLabeler(os.path.join(args.data_dir, 'nf', 'tags.csv'))
+        nf.MultiLabeler(os.path.join(args.data_dir, 'tags.csv'))
     )
-    path_prefix = []
+    data_path = []
     for corpus in args.corpora:
-        path_prefix.append(os.path.join(args.data_dir, corpus))
-    train(args, mc, model_result_dir, path_prefix)
+        data_path.append(os.path.join(args.data_dir, corpus))
+    train(args, mc, result_dir, data_path, 'label', 'text')
