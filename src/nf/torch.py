@@ -51,10 +51,10 @@ class TokenClassModelContainer(ModelContainer):
         self.model.to(self.device)
 
     def compute_metrics(self, p, test: bool = False):
-        predictions_list, labels_list = p
+        logits, labels_list = p
 
         # select predicted index with maximum logit for each token
-        predictions_list = np.argmax(predictions_list, axis=2)
+        predictions_list = np.argmax(logits, axis=2)
 
         tagged_predictions_list = []
         tagged_labels_list = []
@@ -97,10 +97,10 @@ class SeqClassModelContainer(ModelContainer):
         )
 
     def compute_metrics(self, p):
-        pred, labels = p
+        logits, labels = p
 
         # select predicted index with maximum logit for each token
-        pred = np.argmax(pred, axis=1)
+        pred = np.argmax(logits, axis=1)
 
         result = {}
         for k, v in self.metric.items():
