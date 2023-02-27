@@ -63,8 +63,8 @@ class TokenClassModelContainer(ModelContainer):
             tagged_labels = []
             for pid, lid in zip(predictions, labels):
                 if lid != -100:
-                    tagged_predictions.append(self.ids_to_labels[pid])
-                    tagged_labels.append(self.ids_to_labels[lid])
+                    tagged_predictions.append(self.labeler.id2label(pid))
+                    tagged_labels.append(self.labeler.id2label(lid))
             tagged_predictions_list.append(tagged_predictions)
             tagged_labels_list.append(tagged_labels)
 

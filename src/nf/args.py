@@ -1,11 +1,28 @@
 import os
 import logging
-from typing import List, Dict
+from typing import Dict, Any
 
 import nf
 
 logger = logging.getLogger('args')
 logger.addFilter(nf.fmt_filter)
+
+
+def chech_param(conf: Dict, p_name: str) -> Any:
+    p = conf.get(p_name)
+    if not p:
+        logger.warning('Missing [%s] param in [%s] config', p_name, conf)
+        exit(1)
+    return p
+
+
+def chech_dir_param(conf: Dict, param_name: str, parent_path: str) -> str:
+    fname = chech_param(conf, param_name)
+    fpath = os.path.join(parent_path, fname)
+    if not os.path.exists(fpath):
+        logger.warning('Missing [%s] filename in dir [%s]', fname, parent_path)
+        exit(1)
+    return fpath
 
 
 def dir_path(dir_name) -> str:

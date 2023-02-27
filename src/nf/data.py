@@ -4,9 +4,13 @@ import os
 import nf
 import nf.args
 
-from typing import List, Dict
 import numpy as np
 import pandas as pd
+import classla
+import stanza
+
+from typing import List, Dict
+from stanza.utils.conll import CoNLL
 
 logger = logging.getLogger('data')
 logger.addFilter(nf.fmt_filter)
@@ -22,6 +26,31 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super(NpEncoder, self).default(obj)
+
+
+def get_classla_tokenizer(lang: str):
+    classla_dir = os.path.join(nf.default_tmp_dir, 'classla')
+    if not os.path.exists(classla_dir):
+        os.makedirs(classla_dir)
+    if not os.path.exists(os.path.join(classla_dir, lang)):
+        classla.download(lang, classla_dir)
+    return classla.Pipeline(lang, dir=classla_dir, processors="tokenize", download_method=2)
+
+
+def get_stanza_tokenizer(lang: str):
+    stanza_dir = os.path.join(nf.default_tmp_dir, 'stanza')
+    if not os.path.exists(stanza_dir):
+        os.makedirs(stanza_dir)
+    if not os.path.exists(os.path.join(stanza_dir, lang)):
+        stanza.download(lang, stanza_dir)
+    return stanza.Pipeline(lang, dir=stanza_dir, processors="tokenize", download_method=2)
+
+
+def to_conll(doc):
+    if hasattr(doc, "to_conll"):
+        return doc.to_conll()
+    else:
+        return CoNLL.doc2conll_text(doc)
 
 
 def split_data(args, confs: List[Dict]) -> None:
