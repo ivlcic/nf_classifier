@@ -33,6 +33,10 @@ class ModelContainer(torch.nn.Module):
         device = torch.device("cuda" if use_cuda else "cpu")
         self.device = device
 
+    def forward(self, input_id, mask, label):
+        output = self.model(input_ids=input_id, attention_mask=mask, labels=label, return_dict=False)
+        return output
+
 
 class TokenClassModelContainer(ModelContainer):
 
@@ -45,10 +49,6 @@ class TokenClassModelContainer(ModelContainer):
             id2label=labeler.ids2labels(), label2id=labeler.labels2ids()
         )
         self.model.to(self.device)
-
-    def forward(self, input_id, mask, label):
-        output = self.model(input_ids=input_id, attention_mask=mask, labels=label, return_dict=False)
-        return output
 
     def compute_metrics(self, p, test: bool = False):
         predictions_list, labels_list = p
@@ -89,48 +89,24 @@ class SeqClassModelContainer(ModelContainer):
     def __init__(self, model_dir: str, model_name: str, labeler: nf.Labeler):
         super(SeqClassModelContainer, self).__init__(model_dir, model_name, labeler)
 
-        self.metric = evaluate.load("seqeval")
+        self.metric = {'f1': evaluate.load("f1"), 'accuracy': evaluate.load("accuracy"),
+                       'precision': evaluate.load("precision"), 'recall': evaluate.load("recall")}
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name, cache_dir=model_dir, num_labels=labeler.mun_labels(),
             id2label=labeler.ids2labels(), label2id=labeler.labels2ids()
         )
 
-    def forward(self, input_id, mask, label):
-        output = self.model(input_ids=input_id, attention_mask=mask, labels=label, return_dict=False)
-        return output
-
-    def compute_metrics(self, p, test: bool = False):
-        predictions_list, labels_list = p
+    def compute_metrics(self, p):
+        pred, labels = p
 
         # select predicted index with maximum logit for each token
-        predictions_list = np.argmax(predictions_list, axis=2)
+        pred = np.argmax(pred, axis=1)
 
-        tagged_predictions_list = []
-        tagged_labels_list = []
-        for predictions, labels in zip(predictions_list, labels_list):
-            tagged_predictions = []
-            tagged_labels = []
-            for pid, lid in zip(predictions, labels):
-                if lid != -100:
-                    tagged_predictions.append(self.ids_to_labels[pid])
-                    tagged_labels.append(self.ids_to_labels[lid])
-            tagged_predictions_list.append(tagged_predictions)
-            tagged_labels_list.append(tagged_labels)
+        result = {}
+        for k, v in self.metric.items():
+            result[k] = v.compute(predictions=pred, references=labels)
 
-        results = self.metric.compute(
-            predictions=tagged_predictions_list, references=tagged_labels_list, scheme='IOB2', mode='strict'
-        )
-        if test:
-            return results
-        logger.info("Batch eval: %s", results)
-        if len(logger.handlers) > 0:
-            logger.handlers[0].flush()
-        return {
-            "precision": results["overall_precision"],
-            "recall": results["overall_recall"],
-            "f1": results["overall_f1"],
-            "accuracy": results["overall_accuracy"],
-        }
+        return result
 
 
 class TrainedModelContainer(ModelContainer):
@@ -204,7 +180,7 @@ def train(args, mc: ModelContainer, result_path: str, data_path: str,
         load_best_model_at_end=True,
         save_strategy='epoch',
         learning_rate=args.learn_rate,
-        #optim='adamw_torch',
+        optim='adamw_torch',
         #optim='adamw_hf',
         save_total_limit=1,
         metric_for_best_model='f1',
