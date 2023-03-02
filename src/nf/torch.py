@@ -6,11 +6,12 @@ import pandas as pd
 import torch
 import evaluate
 
-from typing import List
+from typing import List, Any
 from torch.utils.data import DataLoader
 from tokenizers.tokenizers import Encoding
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, AutoModelForTokenClassification, \
     BatchEncoding, PreTrainedModel, PreTrainedTokenizer, TrainingArguments, Trainer
+from sklearn.metrics import classification_report, accuracy_score
 
 import nf
 import nf.data
@@ -23,18 +24,31 @@ class ModelContainer(torch.nn.Module):
     def __init__(self, model_dir: str, model_name: str, labeler: nf.Labeler):
         super(ModelContainer, self).__init__()
 
-        self.labeler = labeler
-        self.model: PreTrainedModel = None
-        self.tokenizer: PreTrainedTokenizer = None
-        self.tokenizer = AutoTokenizer.from_pretrained(
+        self._labeler: nf.Labeler = labeler
+        self._model: PreTrainedModel = None
+        self._metric = None
+        self._tokenizer: PreTrainedTokenizer = None
+        self._tokenizer = AutoTokenizer.from_pretrained(
             model_name, cache_dir=model_dir
         )
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda" if use_cuda else "cpu")
-        self.device = device
+        self._device = device
+
+    def model(self):
+        return self._model
+
+    def labeler(self):
+        return self._labeler
+
+    def tokenizer(self):
+        return self._tokenizer
+
+    def metric(self):
+        return self._metric
 
     def forward(self, input_id, mask, label):
-        output = self.model(input_ids=input_id, attention_mask=mask, labels=label, return_dict=False)
+        output = self._model(input_ids=input_id, attention_mask=mask, labels=label, return_dict=False)
         return output
 
 
@@ -43,12 +57,12 @@ class TokenClassModelContainer(ModelContainer):
     def __init__(self, model_dir: str, model_name: str, labeler: nf.Labeler):
         super(TokenClassModelContainer, self).__init__(model_dir, model_name, labeler)
 
-        self.metric = evaluate.load("seqeval")
-        self.model = AutoModelForTokenClassification.from_pretrained(
+        self._metric = evaluate.load("seqeval")
+        self._model = AutoModelForTokenClassification.from_pretrained(
             model_name, cache_dir=model_dir, num_labels=labeler.mun_labels(),
             id2label=labeler.ids2labels(), label2id=labeler.labels2ids()
         )
-        self.model.to(self.device)
+        self._model.to(self._device)
 
     def compute_metrics(self, p, test: bool = False):
         logits, labels_list = p
@@ -63,12 +77,12 @@ class TokenClassModelContainer(ModelContainer):
             tagged_labels = []
             for pid, lid in zip(predictions, labels):
                 if lid != -100:
-                    tagged_predictions.append(self.labeler.id2label(pid))
-                    tagged_labels.append(self.labeler.id2label(lid))
+                    tagged_predictions.append(self._labeler.id2label(pid))
+                    tagged_labels.append(self._labeler.id2label(lid))
             tagged_predictions_list.append(tagged_predictions)
             tagged_labels_list.append(tagged_labels)
 
-        results = self.metric.compute(
+        results = self._metric.compute(
             predictions=tagged_predictions_list, references=tagged_labels_list, scheme='IOB2', mode='strict'
         )
         if test:
@@ -84,29 +98,53 @@ class TokenClassModelContainer(ModelContainer):
         }
 
 
+class SklearnClassificationReport:
+
+    def compute(self, predictions: List[Any], references: List[Any], labels: List[str]):
+        result = classification_report(references, predictions, zero_division=0, output_dict=True, target_names=labels)
+        if 'accuracy' not in result:
+            result['accuracy'] = accuracy_score(references, predictions)
+        return result
+
+
 class SeqClassModelContainer(ModelContainer):
 
     def __init__(self, model_dir: str, model_name: str, labeler: nf.Labeler):
         super(SeqClassModelContainer, self).__init__(model_dir, model_name, labeler)
 
-        self.metric = {'f1': evaluate.load("f1"), 'accuracy': evaluate.load("accuracy"),
-                       'precision': evaluate.load("precision"), 'recall': evaluate.load("recall")}
-        self.model = AutoModelForSequenceClassification.from_pretrained(
+        self._metric = SklearnClassificationReport()
+        self._model = AutoModelForSequenceClassification.from_pretrained(
             model_name, cache_dir=model_dir, num_labels=labeler.mun_labels(),
             id2label=labeler.ids2labels(), label2id=labeler.labels2ids()
         )
 
-    def compute_metrics(self, p):
+    def compute_metrics(self, p, test: bool = False):
         logits, labels = p
 
         # select predicted index with maximum logit for each token
         pred = np.argmax(logits, axis=1)
 
-        result = {}
-        for k, v in self.metric.items():
-            result[k] = v.compute(predictions=pred, references=labels)
+        if isinstance(self._labeler, nf.MultiLabeler):
+            decoded_predictions = []
+            decoded_labels = []
+            for p, l in zip(pred, labels):
+                decoded_predictions.append(self._labeler.binpowset(p))
+                decoded_labels.append(self._labeler.binpowset(l))
+            pred = decoded_predictions
+            labels = decoded_labels
 
-        return result
+        results = self._metric.compute(predictions=pred, references=labels, labels=self._labeler.source_labels())
+        if test:
+            return results
+        logger.info("Batch eval: %s", results)
+        if len(logger.handlers) > 0:
+            logger.handlers[0].flush()
+        return {
+            "precision": results['macro avg']["precision"],
+            "recall": results['macro avg']["recall"],
+            "f1": results['macro avg']["f1-score"],
+            "accuracy": results['accuracy']
+        }
 
 
 class TrainedModelContainer(ModelContainer):
@@ -126,21 +164,21 @@ class DataSequence(torch.utils.data.Dataset):
             elif word_idx < 0 or word_idx >= max_idx:
                 label_ids.append(-100)
             else:
-                label_ids.append(self.labeler.label2id(labels[word_idx]))
+                label_ids.append(self._labeler.label2id(labels[word_idx]))
         return label_ids
 
     def __init__(self, model: ModelContainer, data: pd.DataFrame, max_seq_len: int,
                  label_field: str = 'label', text_field: str = 'text'):
         """Encodes the text data and labels
         """
-        self.model = model
-        self.labeler = model.labeler
+        self._model = model
+        self._labeler = model.labeler()
         self.max_seq_len = max_seq_len
 
-        ds_labels = [self.labeler.filter_replace(line).split() for line in data[label_field].values.tolist()]
+        ds_labels = [self._labeler.filter_replace(line).split() for line in data[label_field].values.tolist()]
 
         # check if labels in the dataset are also in labeler
-        true_labels = self.labeler.kept_labels()
+        true_labels = self._labeler.kept_labels()
         unique_labels = set()
         for lb in ds_labels:
             [unique_labels.add(i) for i in lb if i not in unique_labels]
@@ -151,7 +189,7 @@ class DataSequence(torch.utils.data.Dataset):
 
         # encode the text
         texts = data[text_field].values.tolist()
-        self.encodings: BatchEncoding = model.tokenizer(
+        self.encodings: BatchEncoding = model.tokenizer()(
             texts, padding='max_length', max_length=max_seq_len, truncation=True, return_tensors="pt"
         )
         # encode the labels
@@ -198,11 +236,11 @@ def train(args, mc: ModelContainer, result_path: str, data_path: str,
     training_args.logging_steps = len(train_set)
 
     trainer = Trainer(
-        model=mc.model,
+        model=mc.model(),
         args=training_args,
         train_dataset=train_set,
         eval_dataset=eval_set,
-        tokenizer=mc.tokenizer,
+        tokenizer=mc.tokenizer(),
         compute_metrics=mc.compute_metrics
     )
     logger.debug("Starting training...")

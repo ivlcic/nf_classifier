@@ -94,6 +94,9 @@ class Labeler:
     def labels(self):
         return self._label_to_id.keys()
 
+    def source_labels(self):
+        return self._source_labels
+
     def mun_labels(self):
         return len(self._label_to_id.keys())
 
@@ -108,10 +111,32 @@ class MultiLabeler(Labeler):
     def __init__(self, file_name: str = None, labels: List = None, replace_labels: List = None):
         super().__init__(file_name, labels, replace_labels)
         n = 2 ** len(self._source_labels)
-        self.labels = []
+        self._labels = []
         for i in range(0, n):
             bitlist = [k for k in range(i.bit_length()) if i & (1 << k)]
             label = ''
             for idx in bitlist:
                 label += self._source_labels[idx]
-            self.labels.append(label)
+            self._labels.append(label)
+        self._label_to_id = {k: v for v, k in enumerate(self._labels) if k not in self._replace_labels.keys()}
+        self._id_to_label = {v: k for v, k in enumerate(self._labels) if k not in self._replace_labels.keys()}
+
+    def decode(self, idx: int):
+        labels = []
+        for i in range(0, idx.bit_length()):
+            mask = 1 << i
+            test = idx & mask
+            if test != 0:
+                labels.append(self._source_labels[i])
+        return labels
+
+    def binpowset(self, idx):
+        labels = []
+        for i in range(0, idx.bit_length()):
+            mask = 1 << i
+            test = idx & mask
+            if test != 0:
+                labels.append(1)
+            else:
+                labels.append(0)
+        return labels
