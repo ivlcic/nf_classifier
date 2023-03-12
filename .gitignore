@@ -128,3 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .idea
+data/*.conll
+tmp/*
+models
+results/models

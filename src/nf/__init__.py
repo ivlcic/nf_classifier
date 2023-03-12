@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from typing import List, Dict
+from datetime import datetime, timedelta
 
 # sad hack
 for x, arg in enumerate(sys.argv):
@@ -140,3 +141,40 @@ class MultiLabeler(Labeler):
             else:
                 labels.append(0)
         return labels
+
+
+class DateIter(object):
+
+    def __init__(self, start_date: datetime, end_date: datetime, step_sec: int = 1800):
+        self._delta: timedelta = end_date - start_date
+        self._start: datetime = start_date
+        self._end: datetime = end_date
+        if self._delta.days > 0:
+            self._range_secs = range(0, (self._delta.days + 1) * (24 * 3600) + self._delta.seconds,  step_sec)
+        else:
+            if step_sec >= self._delta.seconds:
+                step_sec = int(self._delta.seconds / 2)
+            self._range_secs = range(0, self._delta.seconds, step_sec)
+        self._range_pos: int = 1
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._range_pos > 0:
+            secs = self._range_secs[self._range_pos - 1]
+            start = self._start + timedelta(seconds=secs)
+            if start == self._end:
+                raise StopIteration
+        else:
+            raise StopIteration
+
+        try:
+            secs = self._range_secs[self._range_pos]
+            end = self._start + timedelta(seconds=secs)
+            self._range_pos += 1
+        except IndexError:
+            end = self._end
+            self._range_pos = 0
+
+        return start, end
