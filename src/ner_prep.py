@@ -741,6 +741,17 @@ if __name__ == "__main__":
                     'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
                     'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
                 }
+            },
+            {
+                'type': 'wikiann',
+                'lang': args.lang,
+                'zip': args.lang + '-wann.zip',
+                'proc_file': args.lang + '_wann',
+                'result_name': args.lang + '_wann',
+                'ner_conll_idx': 2,
+                'map_filter': {
+                    'max_seq_len': 128
+                }
             }
         ]
         prep_data(args, confs)
@@ -768,10 +779,10 @@ if __name__ == "__main__":
         confs = [
             {
                 'type': 'wikiann',
-                'lang': 'bs',
-                'zip': 'bs-wann.zip',
-                'proc_file': 'bs_wann',
-                'result_name': 'bs_wann',
+                'lang': args.lang,
+                'zip': args.lang + '-wann.zip',
+                'proc_file': args.lang + '_wann',
+                'result_name': args.lang + '_wann',
                 'ner_conll_idx': 2,
                 'map_filter': {
                     'max_seq_len': 128
@@ -784,10 +795,10 @@ if __name__ == "__main__":
         confs = [
             {
                 'type': 'wikiann',
-                'lang': 'mk',
-                'zip': 'mk-wann.zip',
-                'proc_file': 'mk_wann',
-                'result_name': 'mk_wann',
+                'lang': args.lang,
+                'zip': args.lang + '-wann.zip',
+                'proc_file': args.lang + '_wann',
+                'result_name': args.lang + '_wann',
                 'ner_conll_idx': 2,
                 'map_filter': {
                     'max_seq_len': 128
@@ -800,10 +811,10 @@ if __name__ == "__main__":
         confs = [
             {
                 'type': 'wikiann',
-                'lang': 'sq',
-                'zip': 'sq-wann.zip',
-                'proc_file': 'sq_wann',
-                'result_name': 'sq_wann',
+                'lang': args.lang,
+                'zip': args.lang + '-wann.zip',
+                'proc_file': args.lang + '_wann',
+                'result_name': args.lang + '_wann',
                 'ner_conll_idx': 2,
                 'map_filter': {
                     'max_seq_len': 128
