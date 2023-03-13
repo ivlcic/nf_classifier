@@ -56,8 +56,8 @@ __query = '''
 if __name__ == "__main__":
     '''
     source venv/bin/activate
-    src/es_corpus_dl.py data/nf/si_query.json data/nf/middle_east_si.csv 2015-08-01 2016-04-01
-    src/es_corpus_dl.py data/nf/si_query.json data/nf/ukraine_si.csv 2022-02-01 2023-03-12
+    src/es_corpus_dl.py data/nf/si_query.json data/nf/si_middle_east.csv 2015-08-01 2016-04-01
+    src/es_corpus_dl.py data/nf/si_query.json data/nf/si_ukraine.csv 2022-02-01 2023-03-12
     '''
     parser = argparse.ArgumentParser()
     parser.add_argument("query", help="Query file path to dump csv data")

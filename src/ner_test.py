@@ -1,21 +1,23 @@
 #!/usr/bin/env python
+# noinspection PyUnresolvedReferences
 import nf
-import nf.torch
-import nf.args
 import nf.data
-import os
-import logging
+import nf.args
 import argparse
+import logging
+import os
 
-from nf.torch import TokenClassModelContainer, train
 
-logger = logging.getLogger('ner_train')
+from nf.torch import DataSequence, TrainedModelContainer
+from transformers import TrainingArguments, Trainer
+
+logger = logging.getLogger('test')
 logger.addFilter(nf.fmt_filter)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='NER Neural train for Slovene, Croatian and Serbian language')
+        description='NER Test')
     parser.add_argument('corpora', help='Corpora to use', nargs='+',
                         choices=[
                             'sl_500k', 'sl_bsnlp', 'sl_ewsd', 'sl_scr', 'sl',
@@ -31,35 +33,43 @@ if __name__ == "__main__":
                             'pl_bsnlp', 'pl',
                             'sk_bsnlp', 'sk_wann', 'sk'
                         ])
-    parser.add_argument('pretrained_model', help='Pretrained model to use for fine tuning',
-                        choices=['mcbert', 'xlmrb', 'xlmrl'])
-    nf.args.train(parser, 'ner')
-    nf.args.ner(parser)
+    parser.add_argument('pretrained_model', help='Pretrained model to use for testing')
+    nf.args.common_dirs(parser, context='ner')
 
     # noinspection PyTypeChecker
     args = parser.parse_args()
-
     if args.limit_cuda_device is not None:
         logger.info("Will run on specified cuda [%s] device only!", args.limit_cuda_device)
 
-    model_name = args.pretrained_model + '-' + '.'.join(args.corpora)
-    if args.no_misc:
-        model_name += '-nomisc'
-    args.target_model_name = model_name
-
-    result_path = os.path.join(args.models_dir, args.target_model_name)
-    if not os.path.exists(result_path):
-        os.makedirs(result_path)
-
-    mc = TokenClassModelContainer(
+    mc: TrainedModelContainer = TrainedModelContainer(
         nf.args.pretrained_model_path(args, train=True),
-        nf.model_name_map[args.pretrained_model],
         nf.Labeler(
             os.path.join(args.data_dir, 'tags.csv'),
             replace_labels=nf.args.replace_ner_tags(args)
         )
     )
-    data_path = []
+
+    training_args = TrainingArguments(
+        args.models_dir,
+        per_device_train_batch_size=args.batch,
+        per_device_eval_batch_size=args.batch,
+    )
+
+    trainer = Trainer(
+        model=mc.model(),
+        args=training_args,
+        tokenizer=mc.tokenizer(),
+        compute_metrics=mc.compute_metrics
+    )
+    logger.info("Starting test set evaluation...")
+
+    path_prefix = []
     for corpus in args.corpora:
-        data_path.append(os.path.join(args.data_dir, corpus))
-    train(args, mc, result_path, data_path, 'ner', 'sentence')
+        path_prefix.append(os.path.join(args.data_dir, corpus))
+
+    _, _, test_data = nf.data.load_corpus(path_prefix)
+    test_set = DataSequence(mc, test_data, args.max_seq_len)
+    predictions, labels, _ = trainer.predict(test_set)
+    results = mc.compute_metrics((predictions, labels), True)
+    logger.info("Test set evaluation results:")
+    logger.info("%s", results)
