@@ -77,7 +77,7 @@ if __name__ == "__main__":
     args: ArgNamespace = parser.parse_args()
 
     mc = TrainedModelContainer(
-        nf.get_pretrained_model_path(args, True),
+        nf.args.pretrained_model_path(args, train=True),
         nf.Labeler(
             os.path.join(args.data_dir, 'tags.csv'),
             replace_labels=nf.args.replace_ner_tags(args)

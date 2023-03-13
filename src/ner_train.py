@@ -51,7 +51,7 @@ if __name__ == "__main__":
         os.makedirs(result_path)
 
     mc = TokenClassModelContainer(
-        nf.get_pretrained_model_path(args, True),
+        nf.args.pretrained_model_path(args, train=True),
         nf.model_name_map[args.pretrained_model],
         nf.Labeler(
             os.path.join(args.data_dir, 'tags.csv'),

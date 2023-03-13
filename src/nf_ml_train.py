@@ -35,7 +35,7 @@ if __name__ == "__main__":
         os.makedirs(result_dir)
 
     mc = SeqClassModelContainer(
-        nf.get_pretrained_model_path(args, True),
+        nf.args.pretrained_model_path(args, train=True),
         nf.model_name_map[args.pretrained_model],
         nf.MultiLabeler(os.path.join(args.data_dir, 'tags.csv'))
     )

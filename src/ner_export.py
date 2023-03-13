@@ -11,7 +11,7 @@ import os
 from nf.torch import TrainedModelContainer
 
 logger = logging.getLogger('export')
-logger.addFilter(tmmst.fmt_filter)
+logger.addFilter(nf.fmt_filter)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 ArgNamespace = collections.namedtuple(
@@ -34,7 +34,7 @@ if __name__ == "__main__":
         logger.info("Will run on specified cuda [%s] device only!", args.limit_cuda_device)
 
     mc = TrainedModelContainer(
-        nf.get_pretrained_model_path(args, True),
+        nf.args.pretrained_model_path(args, train=True),
         nf.Labeler(
             os.path.join(args.data_dir, 'tags.csv'),
             replace_labels=nf.args.replace_ner_tags(args)
@@ -50,5 +50,5 @@ if __name__ == "__main__":
         os.makedirs(export_path)
 
     logger.info("Exporting model and tokenizer:")
-    logger.info("%s", mc.model.save_pretrained(export_path))
-    logger.info("%s", mc.tokenizer.save_pretrained(export_path))
+    logger.info("%s", mc.model().save_pretrained(export_path))
+    logger.info("%s", mc.tokenizer().save_pretrained(export_path))

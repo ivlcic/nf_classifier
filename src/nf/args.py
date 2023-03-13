@@ -35,6 +35,24 @@ def dir_path(dir_name) -> str:
         raise NotADirectoryError(dir_name)
 
 
+def pretrained_model_path(args, train: bool = False) -> str:
+    if train:
+        pt_model_dir = os.path.join(nf.default_tmp_dir, args.pretrained_model)
+        if not os.path.exists(pt_model_dir):
+            os.makedirs(pt_model_dir)
+        return pt_model_dir
+    else:
+        if isinstance(args.pretrained_model, list):
+            ret = []
+            for m in args.pretrained_model:
+                ret.append(os.path.join(args.models_dir, m))
+            return ret
+        elif isinstance(args.pretrained_model, str):
+            return os.path.join(args.models_dir, args.pretrained_model)
+        else:
+            raise ValueError('Unsupported args.pretrained_model type!')
+
+
 def common_dirs(parser, context: str = None) -> None:
     data = nf.default_data_dir
     models = nf.default_models_dir

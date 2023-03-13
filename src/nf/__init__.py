@@ -39,16 +39,6 @@ model_name_map = {
 }
 
 
-def get_pretrained_model_path(args, train: bool = False) -> str:
-    if train:
-        pt_model_dir = os.path.join(default_tmp_dir, args.pretrained_model)
-        if not os.path.exists(pt_model_dir):
-            os.makedirs(pt_model_dir)
-        return pt_model_dir
-    else:
-        return os.path.join(args.models_dir, args.pretrained_model)
-
-
 class Labeler:
 
     def __init__(self, file_name: str = None, labels: List = None, replace_labels: Dict[str, str] = None):
@@ -107,9 +97,24 @@ class Labeler:
         return text
 
 
+class BinaryLabeler(Labeler):
+
+    def __init__(self, file_name: str = None, labels: List = None, replace_labels: Dict[str, str] = None):
+        super().__init__(file_name, labels, replace_labels)
+        self._source_labels = self._labels
+        self._replace_labels = replace_labels
+        if replace_labels is not None:
+            for k in self._replace_labels.keys():
+                self._labels = self._labels.remove(k)
+        if len(self._labels) != 1:
+            raise ValueError('BinaryLabeler should have single label!')
+        self._label_to_id = {self._labels[0]: 1}
+        self._id_to_label = {1: self._labels[0]}
+
+
 class MultiLabeler(Labeler):
 
-    def __init__(self, file_name: str = None, labels: List = None, replace_labels: List = None):
+    def __init__(self, file_name: str = None, labels: List = None, replace_labels: Dict[str, str] = None):
         super().__init__(file_name, labels, replace_labels)
         n = 2 ** len(self._source_labels)
         self._labels = []
