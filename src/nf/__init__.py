@@ -70,8 +70,6 @@ class Labeler:
         return self._label_to_id
 
     def id2label(self, _id: int) -> str:
-        if not _id:
-            return None
         if _id in self._id_to_label:
             return self._id_to_label[_id]
         return None
