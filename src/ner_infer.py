@@ -69,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument('lang', help='language of the text needed for the word tokenizer.',
                         choices=['sl', 'hr', 'sr', 'bs', 'mk', 'sq', 'cs', 'pl', 'ru'])
     parser.add_argument('text', help='Text to classify')
-    nf.args.common_dirs(parser)
+    nf.args.common_dirs(parser, context='ner')
     nf.args.ner(parser)
     nf.args.device(parser)
 

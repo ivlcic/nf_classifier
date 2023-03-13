@@ -93,6 +93,11 @@ def parse_mwt_token(r: str) -> List[str]:
 def conll2csv(conll_path: str, base_name: str, append: bool, ner_tag_idx: int, map_filter: Dict[str, Any] = None):
     if map_filter is None:
         map_filter = {}
+
+    labeler = nf.Labeler(
+        os.path.join(args.data_dir, 'tags.csv')
+    )
+
     csv_fname = base_name + '.csv'
     json_fname = base_name + '.json'
     conll_fname = base_name + '.conll'
@@ -110,7 +115,7 @@ def conll2csv(conll_path: str, base_name: str, append: bool, ner_tag_idx: int, m
             '32': 0, '64': 0, '128': 0, '256': 0, '512': 0
         }
     }
-    stats['tags'].update(nf.ner_tags)
+    stats['tags'].update(labeler.labels2ids())
     sentence = {'id': None, 'tokens': [], 'text': ''}
     max_seq_len = map_filter.get('max_seq_len', 128)
     stop_at = map_filter.get('stop_at', -1)
@@ -486,7 +491,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='NER Data preparation and normalization for Slovene, Croatian and Serbian language')
     parser.add_argument('lang', help='language of the text',
-                        choices=['sl', 'hr', 'sr', 'bs', 'mk', 'sq', 'cs'])
+                        choices=['sl', 'hr', 'sr', 'bs', 'mk', 'sq', 'cs', 'bg', 'pl', 'ru', 'sk', 'uk'])
     parser.add_argument(
         '-d', '--data_dir', help='Data output directory', type=nf.args.dir_path,
         default=os.path.join(nf.default_data_dir, 'ner'))
@@ -510,11 +515,12 @@ if __name__ == "__main__":
                 'type': 'conll',
                 'zip': 'SUK.CoNLL-U.zip',
                 'proc_file': os.path.join('SUK.CoNLL-U', 'ssj500k-syn.ud.conllu'),
-                'result_name': 'sl_500k',
+                'result_name': args.lang + '_500k',
                 'ner_conll_idx': 9,
                 'map_filter': {
                     'max_seq_len': 128,
                     'stop_at': 9483,
+                    'lang': args.lang,
                     'B-loc': 'B-LOC', 'I-loc': 'I-LOC',
                     'B-org': 'B-ORG', 'I-org': 'I-ORG',
                     'B-per': 'B-PER', 'I-per': 'I-PER',
@@ -526,10 +532,11 @@ if __name__ == "__main__":
                 'type': 'conll',
                 'zip': 'SUK.CoNLL-U.zip',
                 'proc_file': os.path.join('SUK.CoNLL-U', 'senticoref.ud.conllu'),
-                'result_name': 'sl_scr',
+                'result_name': args.lang + '_scr',
                 'ner_conll_idx': 9,
                 'map_filter': {
                     'max_seq_len': 128,
+                    'lang': args.lang,
                     'B-loc': 'B-LOC', 'I-loc': 'I-LOC',
                     'B-org': 'B-ORG', 'I-org': 'I-ORG',
                     'B-per': 'B-PER', 'I-per': 'I-PER',
@@ -541,10 +548,11 @@ if __name__ == "__main__":
                 'type': 'conll',
                 'zip': 'SUK.CoNLL-U.zip',
                 'proc_file': os.path.join('SUK.CoNLL-U', 'elexiswsd.ud.conllu'),
-                'result_name': 'sl_ewsd',
+                'result_name': args.lang + '_ewsd',
                 'ner_conll_idx': 9,
                 'map_filter': {
                     'max_seq_len': 128,
+                    'lang': args.lang,
                     'B-loc': 'B-LOC', 'I-loc': 'I-LOC',
                     'B-org': 'B-ORG', 'I-org': 'I-ORG',
                     'B-per': 'B-PER', 'I-per': 'I-PER',
@@ -556,10 +564,10 @@ if __name__ == "__main__":
                 'type': 'bsnlp',
                 'zip': 'bsnlp-2017-21.zip',
                 'proc_file': 'bsnlp',
-                'result_name': 'sl_bsnlp',
+                'result_name': args.lang + '_bsnlp',
                 'map_filter': {
                     'max_seq_len': 128,
-                    'lang': 'sl',
+                    'lang': args.lang,
                     'tokenizer': tokenizer,
                     'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
                     'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
@@ -575,10 +583,11 @@ if __name__ == "__main__":
                 'type': 'conll',
                 'zip': 'hr500k-1.0.zip',
                 'proc_file': os.path.join('hr500k.conll', 'hr500k.conll'),
-                'result_name': 'hr_500k',
+                'result_name': args.lang + '_500k',
                 'ner_conll_idx': 10,
                 'map_filter': {
                     'max_seq_len': 128,
+                    'lang': args.lang,
                     'B-loc': 'B-LOC', 'I-loc': 'I-LOC',
                     'B-org': 'B-ORG', 'I-org': 'I-ORG',
                     'B-per': 'B-PER', 'I-per': 'I-PER',
@@ -590,10 +599,10 @@ if __name__ == "__main__":
                 'type': 'bsnlp',
                 'zip': 'bsnlp-2017-21.zip',
                 'proc_file': 'bsnlp',
-                'result_name': 'hr_bsnlp',
+                'result_name': args.lang + '_bsnlp',
                 'map_filter': {
                     'max_seq_len': 128,
-                    'lang': 'hr',
+                    'lang': args.lang,
                     'tokenizer': tokenizer,
                     'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
                     'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
@@ -608,10 +617,11 @@ if __name__ == "__main__":
                 'type': 'conll',
                 'zip': 'setimes-sr.conll.zip',
                 'proc_file': os.path.join('setimes-sr.conll', 'set.sr.conll'),
-                'result_name': 'sr_set',
+                'result_name': args.lang + '_set',
                 'ner_conll_idx': 10,
                 'map_filter': {
                     'max_seq_len': 128,
+                    'lang': args.lang,
                     'B-loc': 'B-LOC', 'I-loc': 'I-LOC',
                     'B-org': 'B-ORG', 'I-org': 'I-ORG',
                     'B-per': 'B-PER', 'I-per': 'I-PER',
@@ -623,15 +633,17 @@ if __name__ == "__main__":
         prep_data(args, confs)
         nf.data.split_data(args, confs)
     if args.lang == 'cs':
+        tokenizer = nf.data.get_stanza_tokenizer(args.lang)
         confs = [
             {
                 'type': 'cnec',
                 'zip': 'CNEC_2.0_konkol.zip',
                 'proc_file': 'CNEC_2.0_konkol',
-                'result_name': 'cs_cnec',
+                'result_name': args.lang + '_cnec',
                 'ner_conll_idx': 2,
                 'map_filter': {
                     'max_seq_len': 128,
+                    'lang': args.lang,
                     'B-G': 'B-LOC', 'I-G': 'I-LOC',
                     'B-I': 'B-ORG', 'I-I': 'I-ORG',
                     'B-M': 'B-ORG', 'I-M': 'I-ORG',
@@ -639,6 +651,114 @@ if __name__ == "__main__":
                     'B-O': 'B-MISC', 'I-O': 'I-MISC',
                     'B-T': 'O', 'I-T': 'O',
                     'B-A': 'O', 'I-A': 'O'
+                }
+            },
+            {
+                'type': 'bsnlp',
+                'zip': 'bsnlp-2017-21.zip',
+                'proc_file': 'bsnlp',
+                'result_name': args.lang + '_bsnlp',
+                'map_filter': {
+                    'max_seq_len': 128,
+                    'lang': args.lang,
+                    'tokenizer': tokenizer,
+                    'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
+                    'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
+                }
+            }
+        ]
+        prep_data(args, confs)
+        nf.data.split_data(args, confs)
+    if args.lang == 'bg':
+        tokenizer = nf.data.get_classla_tokenizer(args.lang)
+        confs = [
+            {
+                'type': 'bsnlp',
+                'zip': 'bsnlp-2017-21.zip',
+                'proc_file': 'bsnlp',
+                'result_name': args.lang + '_bsnlp',
+                'map_filter': {
+                    'max_seq_len': 128,
+                    'lang': args.lang,
+                    'tokenizer': tokenizer,
+                    'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
+                    'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
+                }
+            }
+        ]
+        prep_data(args, confs)
+        nf.data.split_data(args, confs)
+    if args.lang == 'ru':
+        tokenizer = nf.data.get_stanza_tokenizer(args.lang)
+        confs = [
+            {
+                'type': 'bsnlp',
+                'zip': 'bsnlp-2017-21.zip',
+                'proc_file': 'bsnlp',
+                'result_name': args.lang + '_bsnlp',
+                'map_filter': {
+                    'max_seq_len': 128,
+                    'lang': args.lang,
+                    'tokenizer': tokenizer,
+                    'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
+                    'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
+                }
+            }
+        ]
+        prep_data(args, confs)
+        nf.data.split_data(args, confs)
+    if args.lang == 'pl':
+        tokenizer = nf.data.get_stanza_tokenizer(args.lang)
+        confs = [
+            {
+                'type': 'bsnlp',
+                'zip': 'bsnlp-2017-21.zip',
+                'proc_file': 'bsnlp',
+                'result_name': args.lang + '_bsnlp',
+                'map_filter': {
+                    'max_seq_len': 128,
+                    'lang': args.lang,
+                    'tokenizer': tokenizer,
+                    'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
+                    'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
+                }
+            }
+        ]
+        prep_data(args, confs)
+        nf.data.split_data(args, confs)
+    if args.lang == 'sk':
+        tokenizer = nf.data.get_stanza_tokenizer(args.lang)
+        confs = [
+            {
+                'type': 'bsnlp',
+                'zip': 'bsnlp-2017-21.zip',
+                'proc_file': 'bsnlp',
+                'result_name': args.lang + '_bsnlp',
+                'map_filter': {
+                    'max_seq_len': 128,
+                    'lang': args.lang,
+                    'tokenizer': tokenizer,
+                    'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
+                    'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
+                }
+            }
+        ]
+        prep_data(args, confs)
+        nf.data.split_data(args, confs)
+    if args.lang == 'uk':
+        tokenizer = nf.data.get_stanza_tokenizer(args.lang)
+        confs = [
+            {
+                'type': 'bsnlp',
+                'zip': 'bsnlp-2017-21.zip',
+                'proc_file': 'bsnlp',
+                'result_name': args.lang + '_bsnlp',
+                'map_filter': {
+                    'max_seq_len': 128,
+                    'lang': args.lang,
+                    'tokenizer': tokenizer,
+                    'B-EVT': 'B-MISC', 'I-EVT': 'I-MISC',
+                    'B-PRO': 'B-MISC', 'I-PRO': 'I-MISC'
                 }
             }
         ]
